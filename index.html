@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>职途 AI · 智能求职助手</title>
+<meta name="description" content="聚合国内互联网公司招聘信息,求职进度追踪,JD 与简历智能匹配,基于 JD 改写简历 - 给求职者的一站式工作台" />
+<meta name="keywords" content="AI 求职助手,求职工具,JD 匹配,简历优化,校招,社招,字节跳动,小红书,B站" />
+<meta name="author" content="职途 AI" />
+
+<!-- Open Graph 分享卡片 (微信/小红书/LinkedIn) -->
+<meta property="og:title" content="职途 AI · 智能求职助手" />
+<meta property="og:description" content="聚合 / 追踪 / 匹配 / 优化 - 一站式求职工作台" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://job-hunter-pro.vercel.app/" />
+<meta property="og:image" content="https://job-hunter-pro.vercel.app/og.png" />
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image" />
+<meta name="twitter:title" content="职途 AI · 智能求职助手" />
+<meta name="twitter:description" content="一站式求职工作台" />
+
+<!-- PWA 主题色 -->
+<meta name="theme-color" content="#6c8cff" />
+
+<!-- 字体 -->
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+<link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">职</div>
+    <div>
+      <h1>职途 AI</h1>
+      <p class="tagline">聚合 · 追踪 · 匹配 · 优化 — 一站式求职工作台</p>
+    </div>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button class="tab active" data-tab="discover">🔍 发现职位</button>
+    <button class="tab" data-tab="tracker">📋 求职追踪</button>
+    <button class="tab" data-tab="match">🎯 JD 匹配</button>
+    <button class="tab" data-tab="optimize">✨ 简历优化</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ============== TAB 1: 发现职位 ============== -->
+  <section class="panel active" id="tab-discover">
+    <div class="panel-head">
+      <div>
+        <h2>职位发现</h2>
+        <p class="muted">聚合国内互联网公司招聘信息(大厂/中厂/小厂/校招),支持关键词 + 公司 + 城市 + 校招/社招筛选</p>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" id="btn-refresh">🔄 重新抓取</button>
+        <button class="btn ghost" id="btn-source-info">📡 数据源说明</button>
+      </div>
+    </div>
+
+    <div class="subtabs" id="discover-subtabs">
+      <button class="subtab active" data-sub="all">全部</button>
+      <button class="subtab" data-sub="social">🧑‍💼 社招</button>
+      <button class="subtab" data-sub="campus-grad">🎓 校招 (应届)</button>
+      <button class="subtab" data-sub="campus-intern">📚 实习</button>
+    </div>
+
+    <div class="filters">
+      <input id="q-keyword" class="input" type="text" placeholder="搜索职位,例如:AI 产品经理" />
+      <select id="q-company" class="input">
+        <option value="">全部公司</option>
+      </select>
+      <select id="q-city" class="input">
+        <option value="">全部城市</option>
+      </select>
+      <select id="q-category" class="input">
+        <option value="">全部类别</option>
+        <option value="product">产品</option>
+        <option value="tech">技术</option>
+        <option value="design">设计</option>
+        <option value="operation">运营</option>
+        <option value="ai">AI</option>
+      </select>
+      <button id="btn-search" class="btn primary">搜索</button>
+    </div>
+
+    <div class="result-meta">
+      <span id="result-count">0</span> 个职位 ·
+      <span id="last-fetch"></span>
+    </div>
+
+    <div id="job-list" class="job-list"></div>
+  </section>
+
+  <!-- ============== TAB 2: 求职追踪 ============== -->
+  <section class="panel" id="tab-tracker">
+    <div class="panel-head">
+      <div>
+        <h2>求职进度看板</h2>
+        <p class="muted">追踪每一份投递的状态,清晰看到所有待办</p>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="btn-add-tracker">+ 新增投递</button>
+      </div>
+    </div>
+
+    <div class="kanban" id="kanban"></div>
+
+    <!-- Modal: 新增 / 编辑 -->
+    <div class="modal" id="modal-tracker" hidden>
+      <div class="modal-card">
+        <h3 id="modal-title">新增投递</h3>
+        <label>公司 <input id="m-company" class="input" placeholder="字节跳动" /></label>
+        <label>职位 <input id="m-role" class="input" placeholder="AI 产品经理" /></label>
+        <label>地点 <input id="m-loc" class="input" placeholder="北京 / 上海 / Remote" /></label>
+        <label>JD 链接 <input id="m-url" class="input" placeholder="https://..." /></label>
+        <label>当前阶段
+          <select id="m-status" class="input">
+            <option value="wishlist">待投递</option>
+            <option value="applied">已投递</option>
+            <option value="written">笔试中</option>
+            <option value="interview-1">一面</option>
+            <option value="interview-2">二面</option>
+            <option value="interview-3">三面</option>
+            <option value="offer">已拿 Offer</option>
+            <option value="rejected">已拒</option>
+          </select>
+        </label>
+        <label>备注 <textarea id="m-note" class="input" rows="3" placeholder="HR 联系方式 / 内推人 / 注意事项"></textarea></label>
+        <div class="modal-actions">
+          <button class="btn ghost" id="btn-modal-cancel">取消</button>
+          <button class="btn primary" id="btn-modal-save">保存</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============== TAB 3: JD 匹配 ============== -->
+  <section class="panel" id="tab-match">
+    <div class="panel-head">
+      <div>
+        <h2>JD · 简历匹配分析</h2>
+        <p class="muted">上传/粘贴简历 + JD,智能给出匹配度评分与原因拆解</p>
+      </div>
+      <div class="actions">
+        <select id="q-sample-type" class="input" style="max-width:180px">
+          <option value="social">📋 示例: 社招 JD</option>
+          <option value="campus-grad">🎓 示例: 校招 JD</option>
+          <option value="campus-intern">📚 示例: 实习 JD</option>
+        </select>
+      </div>
+    </div>
+    <div class="match-grid">
+      <div>
+        <h3>📄 岗位 JD</h3>
+        <textarea id="jd-input" class="input area" rows="14" placeholder="将招聘网站的 JD 文本粘贴到这里,或点击右上角载入示例..."></textarea>
+      </div>
+      <div>
+        <div class="resume-head">
+          <h3 style="margin:0">👤 我的简历</h3>
+          <div id="resume-status" class="resume-status">未上传</div>
+        </div>
+        <textarea id="resume-input" class="input area" rows="14" placeholder="上传 PDF / Word / TXT 简历,或直接粘贴简历文本..."></textarea>
+        <div class="row resume-actions">
+          <label class="btn ghost file-label">
+            📎 上传 PDF/Word
+            <input type="file" id="resume-file" accept=".pdf,.doc,.docx,.txt,.md" hidden />
+          </label>
+          <button class="btn ghost" id="btn-load-resume">载入示例</button>
+          <button class="btn ghost" id="btn-clear-resume">🗑 清除</button>
+          <button class="btn primary" id="btn-analyze">🎯 开始匹配分析</button>
+        </div>
+      </div>
+    </div>
+    <div id="match-result" class="match-result" hidden></div>
+  </section>
+
+  <!-- ============== TAB 4: 简历优化 ============== -->
+  <section class="panel" id="tab-optimize">
+    <div class="panel-head">
+      <div>
+        <h2>基于 JD 的简历改写</h2>
+        <p class="muted">针对目标岗位,生成逐条改写建议与完整新简历</p>
+      </div>
+    </div>
+    <div class="match-grid">
+      <div>
+        <h3>📄 目标 JD</h3>
+        <textarea id="opt-jd" class="input area" rows="12" placeholder="粘贴目标岗位 JD..."></textarea>
+      </div>
+      <div>
+        <h3>👤 当前简历</h3>
+        <textarea id="opt-resume" class="input area" rows="12" placeholder="粘贴你的现有简历..."></textarea>
+        <div class="row">
+          <button class="btn ghost" id="btn-load-resume2">载入示例</button>
+          <button class="btn primary" id="btn-optimize">生成改写建议</button>
+        </div>
+      </div>
+    </div>
+    <div id="opt-result" class="match-result" hidden></div>
+  </section>
+</main>
+
+<div id="toast" class="toast" hidden></div>
+
+<!-- 数据源说明 Modal -->
+<div class="modal" id="modal-source" hidden>
+  <div class="modal-card">
+    <h3>📡 数据源说明</h3>
+    <p>本工具收录 <b>国内互联网公司 123+ 个真实岗位模板</b>(大厂/中厂/小厂/初创/校招),覆盖:</p>
+    <ul>
+      <li>🏢 <b>大厂</b> - 字节/腾讯/阿里/百度/美团/京东/小红书/快手/滴滴/拼多多/网易/知乎/蚂蚁/华为/小米</li>
+      <li>🏬 <b>中厂</b> - B站/虎牙/斗鱼/腾讯音乐/网易云音乐/爱奇艺/携程/得物/Keep/Soul/米哈游/莉莉丝</li>
+      <li>🏪 <b>小厂/初创</b> - 飞书/企微/石墨/语雀/WPS/美图/影石/大疆/追觅/石头/蔚来/小鹏/理想/比亚迪</li>
+      <li>🤖 <b>AI 创业</b> - Kimi/智谱/DeepSeek/MiniMax/阶跃星辰/百川/零一万物/面壁/生数/Vidu</li>
+      <li>🎓 <b>校招/实习</b> - 大厂校招岗 + 实习岗,自动标注 🎓</li>
+    </ul>
+    <p class="muted">每条职位:<br>
+    • 带 <b>该公司官网搜索 URL</b>(点过去直接是该岗位的搜索结果页)<br>
+    • 带 <b>完整 JD 模板</b>(含岗位职责/任职要求/加分项/福利,6 段式)<br>
+    • 点 📄 完整 JD 可复制 / 跳转投递 / 一键分析简历匹配度</p>
+    <div class="modal-actions">
+      <button class="btn primary" id="btn-source-close">我知道了</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

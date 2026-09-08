@@ -1,0 +1,10 @@
+{
+  "name": "job-hunter-pro",
+  "version": "1.0.0",
+  "private": true,
+  "description": "职途 AI · 智能求职助手 - 聚合 / 追踪 / 匹配 / 优化",
+  "scripts": {
+    "dev": "python3 -m http.server 8765",
+    "start": "python3 -m http.server 8765"
+  }
+}

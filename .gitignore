@@ -27,4 +27,5 @@ yarn-error.log*
 
 # 本地调试产物
 deployed-screenshot.png
+fix-*.png
 *.local.html

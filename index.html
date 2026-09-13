@@ -43,6 +43,7 @@
     <button class="tab" data-tab="tracker">📋 求职追踪</button>
     <button class="tab" data-tab="match">🎯 JD 匹配</button>
     <button class="tab" data-tab="optimize">✨ 简历优化</button>
+    <button class="tab" data-tab="interview">🎤 面试准备</button>
   </nav>
 </header>
 
@@ -200,6 +201,47 @@
       </div>
     </div>
     <div id="opt-result" class="match-result" hidden></div>
+  </section>
+
+  <!-- ============== TAB 5: 面试准备 ============== -->
+  <section class="panel" id="tab-interview">
+    <div class="panel-head">
+      <div>
+        <h2>AI 模拟面试</h2>
+        <p class="muted">基于 JD + 简历,AI 预测 10 道最可能被问到的面试题,给出 STAR 法则参考答案</p>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" id="btn-interview-help">❓ 使用说明</button>
+      </div>
+    </div>
+
+    <div class="provider-row">
+      <label class="provider-label">
+        🔑 DeepSeek API Key
+        <input id="interview-key" class="input" type="password" placeholder="sk-..." autocomplete="off" />
+      </label>
+      <span class="provider-hint">仅保存在你浏览器本地,不上传服务器</span>
+    </div>
+
+    <div class="match-grid">
+      <div>
+        <h3>📄 目标岗位 JD</h3>
+        <textarea id="interview-jd" class="input area" rows="10" placeholder="粘贴目标岗位 JD..."></textarea>
+      </div>
+      <div>
+        <div class="resume-head">
+          <h3 style="margin:0">👤 我的简历</h3>
+          <div id="interview-resume-status" class="resume-status">未上传</div>
+        </div>
+        <textarea id="interview-resume" class="input area" rows="10" placeholder="粘贴简历文本,或先到「JD 匹配」上传..."></textarea>
+        <div class="row resume-actions">
+          <button class="btn ghost" id="btn-interview-sample">载入示例</button>
+          <button class="btn primary" id="btn-interview-generate">🎤 生成 10 道面试题</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="interview-result" class="match-result" hidden></div>
   </section>
 </main>
 

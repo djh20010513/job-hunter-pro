@@ -21,6 +21,9 @@ function load(){
 }
 function save(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }
 function uid(){ return 't_' + Math.random().toString(36).slice(2,10); }
+function escapeHtml(s){
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
 function toast(msg){
   const el = $('#toast'); el.textContent = msg; el.hidden = false;
   clearTimeout(toast._t); toast._t = setTimeout(()=> el.hidden = true, 2200);
@@ -703,12 +706,149 @@ function initOptimize(){
   });
 }
 
+// ========== Tab 5: 面试准备 ==========
+const INTERVIEW_SYSTEM_PROMPT = `你是一位资深求职面试教练。用户会给你一份目标岗位的 JD 和一份候选人的简历。请基于两者,预测这场面试最可能被问到的 10 个问题,并给出每个问题的完整参考答案(STAR 法则:Situation/Task/Action/Result)。
+
+要求:
+- 问题要紧扣 JD 关键能力 + 候选人简历中的真实项目,避免泛泛而谈
+- 难度混合:3 道基础背景类、3 道项目深挖类、2 道技术/业务能力类、1 道软素质/动机类、1 道反问面试官的问题
+- 答案要可直接背诵,每个 80-200 字,包含具体场景/数据/方法论
+- 输出 JSON,格式: { "questions": [ { "q": "问题", "a": "参考答案(STAR 格式)", "type": "类型" } ] }
+- 全部用简体中文,不要 markdown 代码块标记`;
+
+async function callDeepSeek({apiKey, system, user}){
+  const r = await fetch('https://api.deepseek.com/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: system },
+        { role: 'user', content: user }
+      ],
+      response_format: { type: 'json_object' },
+      temperature: 0.7
+    })
+  });
+  if(!r.ok){
+    const errBody = await r.text().catch(()=> '');
+    if(r.status === 401) throw new Error('API Key 无效(401),请到 platform.deepseek.com 重新申请或检查复制是否完整');
+    if(r.status === 402) throw new Error('DeepSeek 账户余额不足,请充值');
+    if(r.status === 429) throw new Error('调用频率过高(429),请稍等 30 秒再试');
+    throw new Error('API 调用失败 HTTP ' + r.status + ': ' + (errBody || r.statusText).slice(0, 200));
+  }
+  const data = await r.json();
+  const content = data?.choices?.[0]?.message?.content;
+  if(!content) throw new Error('AI 返回内容为空');
+  try { return JSON.parse(content); }
+  catch(e){ throw new Error('AI 返回的不是有效 JSON: ' + content.slice(0, 100)); }
+}
+
+async function generateInterview(){
+  const apiKey = $('#interview-key').value.trim();
+  const jd = $('#interview-jd').value.trim();
+  const resume = $('#interview-resume').value.trim();
+  if(!apiKey){ toast('⚠️ 请先填写 DeepSeek API Key'); $('#interview-key').focus(); return; }
+  if(!jd || !resume){ toast('⚠️ 请同时填写 JD 与简历'); return; }
+
+  const btn = $('#btn-interview-generate');
+  const oldText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ 生成中(约 10-30 秒)...';
+
+  const userPrompt = `# 目标岗位 JD\n${jd}\n\n# 我的简历\n${resume}\n\n请按要求输出 10 道面试题 + 参考答案。`;
+  const result = $('#interview-result');
+  result.hidden = false;
+  result.innerHTML = '<div class="section-block" style="text-align:center;padding:30px"><p style="color:var(--muted)">🎤 AI 正在思考中...</p></div>';
+  result.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  try {
+    const data = await callDeepSeek({ apiKey, system: INTERVIEW_SYSTEM_PROMPT, user: userPrompt });
+    if(!data.questions || !Array.isArray(data.questions) || data.questions.length === 0){
+      throw new Error('AI 返回的格式不正确(没有 questions 数组)');
+    }
+    renderInterviewResult(data);
+    toast('✅ 已生成 ' + data.questions.length + ' 道面试题');
+  } catch(err){
+    result.innerHTML = '<div class="interview-error"><strong>❌ 生成失败</strong><br>' + escapeHtml(err.message) + '<br><br><small>排查:① 检查 API Key 是否正确 ② 确认网络可访问 api.deepseek.com ③ 余额是否充足</small></div>';
+    toast('❌ 生成失败');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
+function renderInterviewResult(data){
+  const wrap = $('#interview-result');
+  wrap.hidden = false;
+  wrap.innerHTML = '<div class="section-block"><h4>🎤 面试准备清单(' + data.questions.length + ' 道题)</h4><p style="color:var(--muted);font-size:13px;margin:4px 0 12px">点击题目展开参考答案 · 每题附「📋 复制」按钮可单独复制</p><div class="qa-list">' + data.questions.map(function(qa, i){
+    return '<div class="qa-item" data-idx="' + i + '"><div class="qa-question" data-act="toggle"><span class="qa-num">' + (i+1) + '</span><span class="qa-type">' + escapeHtml(qa.type || '综合') + '</span><span class="qa-text">' + escapeHtml(qa.q) + '</span><span class="qa-toggle">▾</span></div><div class="qa-answer" hidden><div class="qa-answer-text">' + escapeHtml(qa.a || '(无答案)') + '</div><button class="btn ghost qa-copy" data-act="copy" data-idx="' + i + '">📋 复制此答案</button></div></div>';
+  }).join('') + '</div></div>';
+
+  // 默认展开第一题
+  const first = wrap.querySelector('.qa-item');
+  if(first){
+    first.classList.add('open');
+    first.querySelector('.qa-answer').hidden = false;
+    first.querySelector('.qa-toggle').textContent = '▴';
+  }
+
+  wrap.addEventListener('click', function(e){
+    const head = e.target.closest('[data-act="toggle"]');
+    if(head){
+      const item = head.parentElement;
+      const ans = item.querySelector('.qa-answer');
+      ans.hidden = !ans.hidden;
+      item.classList.toggle('open', !ans.hidden);
+      head.querySelector('.qa-toggle').textContent = ans.hidden ? '▾' : '▴';
+    }
+    const copy = e.target.closest('[data-act="copy"]');
+    if(copy){
+      const text = copy.parentElement.querySelector('.qa-answer-text').textContent;
+      navigator.clipboard.writeText(text).then(function(){ toast('✅ 答案已复制到剪贴板'); });
+    }
+  });
+}
+
+function initInterview(){
+  // API Key 加载 + 自动保存到 localStorage(仅本地,不上传)
+  const savedKey = localStorage.getItem('jobhunter_deepseek_key') || '';
+  $('#interview-key').value = savedKey;
+  $('#interview-key').addEventListener('blur', function(e){
+    const v = e.target.value.trim();
+    if(v) localStorage.setItem('jobhunter_deepseek_key', v);
+    else localStorage.removeItem('jobhunter_deepseek_key');
+  });
+
+  // 简历自动加载(复用 JD 匹配 Tab 的存储)
+  const savedResume = localStorage.getItem('jobhunter_resume') || '';
+  if(savedResume && !$('#interview-resume').value){
+    $('#interview-resume').value = savedResume;
+    $('#interview-resume-status').textContent = '✅ 已加载已保存简历';
+    $('#interview-resume-status').classList.add('uploaded');
+  }
+
+  // 按钮事件
+  $('#btn-interview-generate').addEventListener('click', generateInterview);
+  $('#btn-interview-sample').addEventListener('click', function(){
+    $('#interview-jd').value = window.SAMPLE_JD || '';
+    $('#interview-resume').value = window.SAMPLE_RESUME || '';
+    toast('✅ 已载入示例 JD + 简历');
+  });
+
+  // 帮助按钮
+  $('#btn-interview-help').addEventListener('click', function(){
+    alert('🎤 面试准备 - 使用说明\n\n1. 填写 DeepSeek API Key(只保存在你浏览器本地)\n   - 去 https://platform.deepseek.com 申请,新用户有免费额度\n   - 复制 sk- 开头的 key 粘贴到输入框\n\n2. 粘贴目标岗位 JD + 你的简历(简历可先在「JD 匹配」上传,会自动同步)\n\n3. 点击「生成 10 道面试题」\n   - 约 10-30 秒返回\n   - 含 3 道基础 + 3 道项目深挖 + 2 道技术 + 1 道软素质 + 1 道反问\n   - 每题附 STAR 法则参考答案,可单独复制\n\n4. 建议:面试前 30 分钟浏览一遍,挑 3-5 道用自己真实经历重写');
+  });
+}
+
 // ========== 初始化 ==========
 load();
 initDiscover();
 initTracker();
 initMatch();
 initOptimize();
+initInterview();
 
 if(state.jobs.length === 0){
   fetchJobs();

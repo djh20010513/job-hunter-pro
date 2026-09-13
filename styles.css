@@ -163,3 +163,25 @@ label .input{margin-top:4px}
 @media(max-width:600px){.channels{grid-template-columns:1fr}}
 .channel{display:block;padding:10px 14px;background:var(--bg2);border:1px solid var(--line);border-radius:10px;color:var(--text);font-size:13px;text-decoration:none;transition:.15s}
 .channel:hover{border-color:var(--primary);background:var(--card2);transform:translateY(-1px)}
+
+/* ========== Tab 5: 面试准备 ========== */
+.provider-row{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap}
+.provider-label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);flex:1;min-width:280px}
+.provider-label .input{flex:1;max-width:420px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:13px}
+.provider-hint{font-size:12px;color:var(--muted);opacity:.75}
+
+.qa-list{display:flex;flex-direction:column;gap:10px;margin-top:12px}
+.qa-item{background:var(--bg2);border:1px solid var(--line);border-radius:12px;overflow:hidden;transition:.2s}
+.qa-item:hover{border-color:var(--primary)}
+.qa-question{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer;user-select:none}
+.qa-num{background:linear-gradient(135deg,#6c8cff,#9b6cff);color:#fff;width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:12px;font-weight:700;flex-shrink:0}
+.qa-type{font-size:11px;color:var(--muted);background:var(--card);padding:2px 8px;border-radius:6px;border:1px solid var(--line);flex-shrink:0}
+.qa-text{flex:1;font-size:14px;font-weight:600;color:var(--text);line-height:1.5}
+.qa-toggle{color:var(--muted);font-size:14px;flex-shrink:0;transition:transform .2s}
+.qa-item.open .qa-toggle{transform:rotate(180deg)}
+.qa-answer{padding:0 14px 14px 50px;border-top:1px solid var(--line);background:rgba(108,140,255,.04)}
+.qa-answer-text{white-space:pre-wrap;font-family:inherit;font-size:13px;line-height:1.75;color:var(--text);margin:12px 0;background:var(--card);padding:12px;border-radius:8px;border:1px solid var(--line)}
+.qa-copy{margin-top:4px}
+
+.interview-error{background:rgba(255,93,108,.1);border:1px solid rgba(255,93,108,.4);border-radius:10px;padding:14px;color:var(--danger);font-size:13px;line-height:1.6;margin-top:12px}
+.interview-error code{background:rgba(0,0,0,.3);padding:1px 6px;border-radius:4px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12px}

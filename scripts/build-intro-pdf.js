@@ -133,7 +133,7 @@ doc.moveDown(0.5);
 doc.font('cn-bold').fontSize(11).fillColor(COLOR_TEXT).text('🌐 在线体验');
 doc.moveDown(0.2);
 doc.font('cn').fontSize(11).fillColor(COLOR_PRIMARY)
-   .text('https://job-hunter-pro-1.vercel.app/', { link: 'https://job-hunter-pro-1.vercel.app/' });
+   .text('https://job-hunter.xin/', { link: 'https://job-hunter.xin/' });
 doc.moveDown(0.3);
 doc.font('cn-bold').fontSize(11).fillColor(COLOR_TEXT).text('📦 开源仓库');
 doc.moveDown(0.2);

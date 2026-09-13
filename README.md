@@ -59,13 +59,13 @@ git push -u origin main
 部署成功后，你会得到类似这样的网址：
 
 ```
-https://job-hunter-pro.vercel.app
+https://job-hunter.xin
 ```
 
 或者（如果你之前用过其他用户名）：
 
 ```
-https://job-hunter-pro-你的用户名.vercel.app
+https://job-hunter.xin
 ```
 
 **任何人任何时候都能打开。**
@@ -115,4 +115,4 @@ Vercel 会**自动重新部署**，1 分钟内网址更新。
 ## 🌟 体验地址
 
 本地预览：`http://localhost:8765/`
-线上部署：部署后会得到 `xxx.vercel.app` 永久网址
+线上部署：https://job-hunter.xin（已配置自定义域名）

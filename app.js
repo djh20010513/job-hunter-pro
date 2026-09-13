@@ -33,6 +33,11 @@ $$('.tab').forEach(t => t.addEventListener('click', () => {
   t.classList.add('active');
   $('#tab-' + t.dataset.tab).classList.add('active');
 }));
+// 程序化切到指定 Tab(供"保存后自动跳转"等场景复用)
+function switchToTab(name){
+  const t = document.querySelector('.tab[data-tab="'+name+'"]');
+  if(t) t.click();
+}
 
 // ========== Tab 1: 发现职位 (实时多源聚合) ==========
 async function fetchJobs(){
@@ -356,7 +361,9 @@ function saveTracker(){
     state.trackers.push(item);
   }
   save(); renderKanban(); closeTrackerModal();
-  toast('✅ 已保存');
+  // 保存后自动跳到追踪看板,用户能立刻看到新卡片,无需手动切 Tab
+  switchToTab('tracker');
+  toast('✅ 已加入追踪看板,可继续编辑阶段/备注');
 }
 
 function initTracker(){

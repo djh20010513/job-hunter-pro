@@ -24,3 +24,7 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+
+# 本地调试产物
+deployed-screenshot.png
+*.local.html

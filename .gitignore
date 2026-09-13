@@ -32,3 +32,6 @@ intro-*.png
 review-tab-*.png
 pdf-page*.png
 *.local.html
+
+# 字体缓存(脚本运行时从 macOS 系统字体提取,可随时重新生成)
+.fonts/

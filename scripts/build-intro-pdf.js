@@ -9,10 +9,18 @@ const path = require('path');
 const ROOT = path.resolve(__dirname, '..');
 const OUT = path.join(ROOT, '项目介绍.pdf');
 
-// 字体路径(macOS 自带 .ttf,pdfkit 不支持 .ttc 集合体)
-// Arial Unicode: 系统自带,含完整 CJK + Latin,适合做项目介绍 PDF
-const FONT_REGULAR = '/Library/Fonts/Arial Unicode.ttf';
-const FONT_BOLD = '/Library/Fonts/Arial Unicode.ttf';
+// 字体路径:
+//   中文:宋体 SC Regular (.ttf,从 macOS 系统 Songti.ttc 用 fontkit 一次性提取,gitignored)
+//   英文:Times New Roman (macOS 自带,4 个字重)
+//   使用 4 个字体:cn / cn-bold / en / en-bold
+//   - 中文内容用 cn (宋体)
+//   - 英文 / 网址用 en (Times New Roman)
+//   - 加粗也用 cn 的同文件,pdfkit 会做轻微 faux-bold(SC Bold 没单独提取)
+//   - 字体文件 .fonts/songti-sc-regular.ttf 不入库,脚本首次跑会从 Songti.ttc 自动提取
+const FONT_CN      = path.join(ROOT, '.fonts', 'songti-sc-regular.ttf');
+const FONT_CN_BOLD = path.join(ROOT, '.fonts', 'songti-sc-regular.ttf');
+const FONT_EN      = '/System/Library/Fonts/Supplemental/Times New Roman.ttf';
+const FONT_EN_BOLD = '/System/Library/Fonts/Supplemental/Times New Roman Bold.ttf';
 
 // 6 张产品截图
 const SHOTS = [
@@ -48,9 +56,11 @@ const doc = new PDFDocument({
   }
 });
 
-// 注册中文字体
-doc.registerFont('cn', FONT_REGULAR);
-doc.registerFont('cn-bold', FONT_BOLD);
+// 注册字体:中文宋体 + 英文 Times New Roman,各 2 个字重
+doc.registerFont('cn', FONT_CN);
+doc.registerFont('cn-bold', FONT_CN_BOLD);
+doc.registerFont('en', FONT_EN);
+doc.registerFont('en-bold', FONT_EN_BOLD);
 
 const stream = fs.createWriteStream(OUT);
 doc.pipe(stream);
@@ -91,9 +101,6 @@ doc.rect(0, 0, PAGE.width, 8).fill(COLOR_PRIMARY);
 
 // 标识
 doc.moveDown(2);
-doc.fillColor(COLOR_PRIMARY).font('cn-bold').fontSize(14).text('ZHI TU · 职途 AI', MARGIN, 80);
-doc.fillColor(COLOR_MUTED).font('cn').fontSize(10)
-   .text('Smart Job-Hunting Assistant · Vibe Coding Portfolio · 2026', MARGIN, 100);
 
 // 主标题
 doc.y = 180;
@@ -104,6 +111,11 @@ doc.font('cn').fontSize(20).fillColor(COLOR_PRIMARY)
 doc.moveDown(0.3);
 doc.font('cn').fontSize(12).fillColor(COLOR_MUTED)
    .text('聚合 · 追踪 · 匹配 · 优化 · 准备 · 复盘');
+
+// 项目主页(用户要求:放在 3 行副标题下方)
+doc.moveDown(0.6);
+doc.font('en').fontSize(13).fillColor(COLOR_PRIMARY)
+   .text('https://www.job-hunter.xin/', { link: 'https://www.job-hunter.xin/' });
 
 // 分割线
 hr();
@@ -132,8 +144,8 @@ hr();
 doc.moveDown(0.5);
 doc.font('cn-bold').fontSize(11).fillColor(COLOR_TEXT).text('🌐 在线体验');
 doc.moveDown(0.2);
-doc.font('cn').fontSize(11).fillColor(COLOR_PRIMARY)
-   .text('https://job-hunter.xin/', { link: 'https://job-hunter.xin/' });
+doc.font('en').fontSize(11).fillColor(COLOR_PRIMARY)
+   .text('https://www.job-hunter.xin/', { link: 'https://www.job-hunter.xin/' });
 doc.moveDown(0.3);
 doc.font('cn-bold').fontSize(11).fillColor(COLOR_TEXT).text('📦 开源仓库');
 doc.moveDown(0.2);

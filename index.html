@@ -44,6 +44,7 @@
     <button class="tab" data-tab="match">🎯 JD 匹配</button>
     <button class="tab" data-tab="optimize">✨ 简历优化</button>
     <button class="tab" data-tab="interview">🎤 面试准备</button>
+    <button class="tab" data-tab="review">🎬 面试复盘</button>
   </nav>
 </header>
 
@@ -242,6 +243,49 @@
     </div>
 
     <div id="interview-result" class="match-result" hidden></div>
+  </section>
+
+  <!-- ============== TAB 6: 面试复盘 ============== -->
+  <section class="panel" id="tab-review">
+    <div class="panel-head">
+      <div>
+        <h2>AI 面试复盘</h2>
+        <p class="muted">上传面试录屏 (MP4) / 录音 (M4A),浏览器内 Whisper 转录 + DeepSeek 分析表现</p>
+      </div>
+      <div class="actions">
+        <button class="btn ghost" id="btn-review-help">❓ 使用说明</button>
+      </div>
+    </div>
+
+    <div class="upload-zone" id="review-drop">
+      <input type="file" id="review-file" accept=".mp4,.m4a,audio/*,video/*" hidden />
+      <div class="upload-prompt">
+        <div class="upload-icon">📁</div>
+        <p style="font-size:15px;margin:8px 0">拖入面试录屏 / 录音,或 <label class="upload-link" for="review-file">点击选择文件</label></p>
+        <p class="muted" style="font-size:12px">支持 MP4(视频,会自动提取音频轨道) / M4A(直接转录更快) · 建议 < 500MB</p>
+      </div>
+      <div class="upload-info" id="review-info" hidden></div>
+    </div>
+
+    <div class="row" id="review-actions" hidden>
+      <button class="btn ghost" id="btn-review-clear">🗑 清除</button>
+      <button class="btn primary" id="btn-review-transcribe">🎙 开始转录</button>
+    </div>
+
+    <div id="review-progress" class="progress-block" hidden></div>
+
+    <div id="review-transcript-block" class="match-result" hidden>
+      <div class="section-block">
+        <h4>📝 转录文本 <span style="font-size:12px;color:var(--muted);font-weight:normal">可在分析前手动修正</span></h4>
+        <textarea id="review-transcript" class="input area transcript-box" rows="12" placeholder="转录文本将出现在这里..."></textarea>
+        <div class="row">
+          <button class="btn ghost" id="btn-review-copy">📋 复制文本</button>
+          <button class="btn primary" id="btn-review-analyze">🧠 分析表现</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="review-analysis" class="match-result" hidden></div>
   </section>
 </main>
 

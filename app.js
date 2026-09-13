@@ -842,6 +842,303 @@ function initInterview(){
   });
 }
 
+// ========== Tab 6: 面试复盘 ==========
+const REVIEW_SYSTEM_PROMPT = `你是一位资深求职面试教练。用户会给你一份面试的完整对话转录。请基于对话内容,分析候选人的整体表现。
+
+要求:
+- 仔细阅读转录,识别每个面试问题和候选人的回答
+- 从以下维度分析:表达的清晰度、逻辑性、专业深度、自信度、互动质量、与岗位 JD 的契合度
+- 找出候选人表现**好的部分**(具体到引用原文片段),说明好在哪里
+- 找出**待优化的部分**(同样引用原文),并给出具体改进建议(可执行的)
+- 整体表现打分 0-100
+- 输出 JSON 格式: { "score": 85, "summary": "整体评价(一句话)", "highlights": [ { "point": "亮点标题", "quote": "原文摘录(可省略)", "reason": "为什么好" } ], "improvements": [ { "point": "不足标题", "quote": "原文摘录(可省略)", "reason": "不足原因", "suggestion": "怎么改" } ], "per_question": [ { "topic": "问题主题", "score": 8, "feedback": "点评" } ] }
+- 全部用简体中文`;
+
+let reviewState = { file: null, transcript: '', analysis: null };
+
+function handleReviewFile(file){
+  reviewState.file = file;
+  const sizeMB = (file.size / 1024 / 1024).toFixed(1);
+  const isVideo = file.type.startsWith('video/') || /\.mp4$/i.test(file.name);
+  $('#review-info').hidden = false;
+  $('#review-info').innerHTML = '<strong>' + escapeHtml(file.name) + '</strong> · ' + sizeMB + ' MB · ' + (isVideo ? '🎬 视频(将提取音频轨道,可能需要几分钟)' : '🎙 音频(直接转录)');
+  $('#review-actions').hidden = false;
+  $('#review-transcript-block').hidden = true;
+  $('#review-analysis').hidden = true;
+  $('#review-progress').hidden = true;
+}
+
+function clearReview(){
+  reviewState = { file: null, transcript: '', analysis: null };
+  $('#review-file').value = '';
+  $('#review-info').hidden = true;
+  $('#review-actions').hidden = true;
+  $('#review-transcript-block').hidden = true;
+  $('#review-analysis').hidden = true;
+  $('#review-progress').hidden = true;
+  toast('🗑 已清除');
+}
+
+function showReviewProgress(text, pct){
+  const wrap = $('#review-progress');
+  wrap.hidden = false;
+  wrap.innerHTML = '<div class="progress-text">' + escapeHtml(text) + '</div><div class="progress-bar"><div style="width:' + pct + '%"></div></div>';
+}
+
+async function decodeAudioToWav(file){
+  const buf = await file.arrayBuffer();
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  let audio;
+  try { audio = await ctx.decodeAudioData(buf); }
+  catch(e){ throw new Error('音频解码失败,文件可能损坏或不支持(推荐导出为 WAV/MP3 16kHz)'); }
+  // 重采样到 16kHz(Whisper 推荐)
+  return audioBufferToWavBlob(audio, 16000);
+}
+
+async function extractAudioFromMp4(file, onProgress){
+  return new Promise(function(resolve, reject){
+    const url = URL.createObjectURL(file);
+    const video = document.createElement('video');
+    video.src = url;
+    video.muted = false;
+    video.crossOrigin = 'anonymous';
+    video.preload = 'auto';
+    let recorder, chunks = [];
+    let cleaned = false;
+    const cleanup = () => { if(!cleaned){ cleaned = true; URL.revokeObjectURL(url); } };
+
+    video.addEventListener('loadedmetadata', function(){
+      if(!isFinite(video.duration) || video.duration === 0){
+        cleanup();
+        return reject(new Error('视频时长无法识别,请检查文件是否完整'));
+      }
+      const stream = video.captureStream ? video.captureStream() : (video.mozCaptureStream ? video.mozCaptureStream() : null);
+      if(!stream){
+        cleanup();
+        return reject(new Error('当前浏览器不支持视频音频提取,请改用 Chrome / Edge'));
+      }
+      const audioTracks = stream.getAudioTracks();
+      if(audioTracks.length === 0){
+        cleanup();
+        return reject(new Error('视频中没有音频轨道(纯录屏),请上传带声音的 MP4 或直接用 M4A'));
+      }
+      const audioOnly = new MediaStream(audioTracks);
+      try { recorder = new MediaRecorder(audioOnly, { mimeType: 'audio/webm' }); }
+      catch(e){ recorder = new MediaRecorder(audioOnly); }
+
+      recorder.ondataavailable = function(e){ if(e.data && e.data.size > 0) chunks.push(e.data); };
+      recorder.onstop = async function(){
+        cleanup();
+        const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        try { const wav = await decodeAudioToWav(blob); resolve(wav); }
+        catch(e){ reject(e); }
+      };
+      recorder.start();
+      video.play().catch(function(e){ cleanup(); reject(new Error('视频播放失败: ' + e.message)); });
+
+      video.addEventListener('timeupdate', function(){
+        if(onProgress && video.duration) onProgress(Math.min(0.99, video.currentTime / video.duration));
+      });
+      video.addEventListener('ended', function(){
+        if(recorder.state !== 'inactive') recorder.stop();
+      });
+    });
+
+    video.addEventListener('error', function(){
+      cleanup();
+      reject(new Error('视频加载失败,文件可能损坏或格式不支持'));
+    });
+    setTimeout(function(){ if(!reviewState.file || reviewState.file !== file){ cleanup(); reject(new Error('操作已取消')); } }, 60000);
+  });
+}
+
+function audioBufferToWavBlob(audioBuffer, targetSampleRate){
+  const numChannels = 1;
+  const sampleRate = targetSampleRate || audioBuffer.sampleRate;
+  const samples = audioBuffer.getChannelData(0);
+  const buffer = new ArrayBuffer(44 + samples.length * 2);
+  const view = new DataView(buffer);
+  const writeString = function(offset, str){ for(let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+  writeString(0, 'RIFF');
+  view.setUint32(4, 36 + samples.length * 2, true);
+  writeString(8, 'WAVE');
+  writeString(12, 'fmt ');
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, sampleRate * numChannels * 2, true);
+  view.setUint16(32, numChannels * 2, true);
+  view.setUint16(34, 16, true);
+  writeString(36, 'data');
+  view.setUint32(40, samples.length * 2, true);
+  let offset = 44;
+  for(let i = 0; i < samples.length; i++){
+    const s = Math.max(-1, Math.min(1, samples[i]));
+    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+    offset += 2;
+  }
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+async function transcribeReviewFile(){
+  const f = reviewState.file;
+  if(!f){ toast('⚠️ 请先选择文件'); return; }
+  const btn = $('#btn-review-transcribe');
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = '⏳ 转录中...';
+  try {
+    showReviewProgress('⏳ 正在加载 Whisper 模型(首次 ~40MB,仅一次)...', 5);
+    if(!window.transformers){
+      await new Promise(function(resolve, reject){
+        const s = document.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2/dist/transformers.min.js';
+        s.onload = resolve;
+        s.onerror = function(){ reject(new Error('Transformers.js 加载失败,请检查网络(需要访问 cdn.jsdelivr.net)')); };
+        document.head.appendChild(s);
+      });
+    }
+    const transformersLib = window.transformers;
+    transformersLib.env.allowLocalModels = false;
+    transformersLib.env.useBrowserCache = true;
+
+    showReviewProgress('⏳ 正在加载 Whisper-tiny 模型...', 15);
+    const asr = await transformersLib.pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
+      quantized: true,
+      progress_callback: function(data){
+        if(data.status === 'progress' && typeof data.progress === 'number'){
+          showReviewProgress('⏳ 下载模型 ' + (data.file || '') + ' (' + data.progress.toFixed(0) + '%)', 15 + data.progress * 0.4);
+        }
+      }
+    });
+
+    showReviewProgress('🎙 正在解码音频...', 60);
+    let wavBlob;
+    if(/\.m4a$/i.test(f.name) || f.type.startsWith('audio/')){
+      wavBlob = await decodeAudioToWav(f);
+    } else {
+      wavBlob = await extractAudioFromMp4(f, function(pct){
+        showReviewProgress('🎬 正在从视频提取音频轨道... ' + (pct*100).toFixed(0) + '%', 60 + pct * 0.2);
+      });
+    }
+
+    showReviewProgress('🎙 正在转录(中文可能需要几分钟到几十分钟,取决于时长)...', 85);
+    const result = await asr(wavBlob, {
+      chunk_length_s: 30,
+      stride_length_s: 5,
+      language: 'chinese',
+      task: 'transcribe'
+    });
+    const text = (result && result.text) ? result.text : '';
+    if(!text){ throw new Error('转录结果为空,请检查音频是否包含人声'); }
+    reviewState.transcript = text;
+    $('#review-transcript').value = text;
+    $('#review-transcript-block').hidden = false;
+    $('#review-progress').hidden = true;
+    toast('✅ 转录完成');
+  } catch(err){
+    showReviewProgress('❌ 转录失败: ' + err.message, 0);
+    toast('❌ ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
+async function analyzeReviewTranscript(){
+  const transcript = $('#review-transcript').value.trim();
+  const apiKey = localStorage.getItem('jobhunter_deepseek_key') || '';
+  if(!transcript){ toast('⚠️ 请先转录文件'); return; }
+  if(!apiKey){ toast('⚠️ 请先在「🎤 面试准备」Tab 填写 DeepSeek API Key'); return; }
+  reviewState.transcript = transcript;
+  const btn = $('#btn-review-analyze');
+  btn.disabled = true;
+  const oldText = btn.textContent;
+  btn.textContent = '⏳ 分析中...';
+  try {
+    const data = await callDeepSeek({ apiKey, system: REVIEW_SYSTEM_PROMPT, user: '# 面试对话转录\n' + transcript + '\n\n请按要求输出 JSON 分析。' });
+    reviewState.analysis = data;
+    renderReviewAnalysis(data);
+    toast('✅ 分析完成');
+  } catch(err){
+    toast('❌ 分析失败: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = oldText;
+  }
+}
+
+function renderReviewAnalysis(data){
+  const wrap = $('#review-analysis');
+  wrap.hidden = false;
+  const score = Number(data.score) || 0;
+  const scoreColor = score >= 80 ? 'var(--success)' : score >= 60 ? 'var(--warn)' : 'var(--danger)';
+  const highlights = data.highlights || [];
+  const improvements = data.improvements || [];
+  const perQ = data.per_question || [];
+  wrap.innerHTML = '<div class="score-display">' +
+    '<div class="score-num" style="color:' + scoreColor + '">' + score + '</div>' +
+    '<div>' +
+      '<div class="score-summary">综合评分</div>' +
+      '<div class="score-label">' + escapeHtml(data.summary || '') + '</div>' +
+    '</div>' +
+  '</div>' +
+  '<div class="analysis-grid">' +
+    '<div class="analysis-card good"><h5>✅ 表现好的部分(' + highlights.length + ')</h5>' +
+      (highlights.length ? highlights.map(function(h){
+        return '<div class="analysis-item">' +
+          '<div class="point">' + escapeHtml(h.point || '') + '</div>' +
+          (h.quote ? '<div class="quote">"' + escapeHtml(h.quote) + '"</div>' : '') +
+          (h.reason ? '<div class="muted" style="font-size:12px">' + escapeHtml(h.reason) + '</div>' : '') +
+        '</div>';
+      }).join('') : '<div class="muted">无</div>') +
+    '</div>' +
+    '<div class="analysis-card bad"><h5>⚠️ 待优化部分(' + improvements.length + ')</h5>' +
+      (improvements.length ? improvements.map(function(h){
+        return '<div class="analysis-item">' +
+          '<div class="point">' + escapeHtml(h.point || '') + '</div>' +
+          (h.quote ? '<div class="quote">"' + escapeHtml(h.quote) + '"</div>' : '') +
+          (h.suggestion ? '<div class="suggest">💡 ' + escapeHtml(h.suggestion) + '</div>' : (h.reason ? '<div class="muted" style="font-size:12px">' + escapeHtml(h.reason) + '</div>' : '')) +
+        '</div>';
+      }).join('') : '<div class="muted">无</div>') +
+    '</div>' +
+  '</div>' +
+  (perQ.length ? '<div class="section-block"><h4>📋 逐题点评(' + perQ.length + ')</h4>' +
+    perQ.map(function(q, i){
+      const qs = Number(q.score) || 0;
+      const qc = qs >= 8 ? 'var(--success)' : qs >= 6 ? 'var(--warn)' : 'var(--danger)';
+      return '<div class="per-question-item"><div class="qh"><span class="qs">' + (i+1) + '. ' + escapeHtml(q.topic || '题目') + '</span><span style="color:' + qc + ';font-weight:700">' + qs + '/10</span></div>' +
+        '<div class="muted" style="font-size:13px">' + escapeHtml(q.feedback || '') + '</div></div>';
+    }).join('') + '</div>' : '');
+  wrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function initReview(){
+  const drop = $('#review-drop');
+  const input = $('#review-file');
+  input.addEventListener('change', function(e){ const f = e.target.files[0]; if(f) handleReviewFile(f); });
+  drop.addEventListener('dragover', function(e){ e.preventDefault(); drop.classList.add('dragging'); });
+  drop.addEventListener('dragleave', function(){ drop.classList.remove('dragging'); });
+  drop.addEventListener('drop', function(e){
+    e.preventDefault();
+    drop.classList.remove('dragging');
+    const f = e.dataTransfer.files[0];
+    if(f) handleReviewFile(f);
+  });
+  $('#btn-review-clear').addEventListener('click', clearReview);
+  $('#btn-review-transcribe').addEventListener('click', transcribeReviewFile);
+  $('#btn-review-analyze').addEventListener('click', analyzeReviewTranscript);
+  $('#btn-review-copy').addEventListener('click', function(){
+    const text = $('#review-transcript').value;
+    if(!text){ toast('⚠️ 转录文本为空'); return; }
+    navigator.clipboard.writeText(text).then(function(){ toast('✅ 文本已复制'); });
+  });
+  $('#btn-review-help').addEventListener('click', function(){
+    alert('🎬 面试复盘 - 使用说明\n\n1. 上传面试录屏 (MP4) 或录音 (M4A)\n   - MP4: 播放一遍静默提取音频轨道(请勿关闭页面)\n   - M4A: 直接转录,更快\n   - 建议 < 500MB\n\n2. 点击「🎙 开始转录」\n   - 首次会从 HuggingFace 下载 ~40MB Whisper-tiny 模型(浏览器缓存,只需一次)\n   - 中文面试约 1 小时录音需要 10-30 分钟转录\n   - 期间可切换 Tab,完成后回来查看\n\n3. 转录完成后:\n   - 可在文本框手动修正(Whisper 中文识别准确率约 70-85%)\n   - 点击「🧠 分析表现」,AI 会基于你的 DeepSeek Key 分析\n\n4. 复用 DeepSeek Key:在「🎤 面试准备」Tab 输入过一次,这里自动复用');
+  });
+}
+
 // ========== 初始化 ==========
 load();
 initDiscover();
@@ -849,6 +1146,7 @@ initTracker();
 initMatch();
 initOptimize();
 initInterview();
+initReview();
 
 if(state.jobs.length === 0){
   fetchJobs();

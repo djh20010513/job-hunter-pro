@@ -38,6 +38,18 @@ function switchToTab(name){
   const t = document.querySelector('.tab[data-tab="'+name+'"]');
   if(t) t.click();
 }
+// 高亮刚保存的卡片并滚到屏幕中央,2 秒后自动消除
+// 解决"切了 Tab 但用户没看到"的问题:页面切换 + 卡片闪烁 + 自动滚动,三重反馈
+function highlightCard(id){
+  const card = document.querySelector(`#kanban .card[data-id="${id}"]`);
+  if(!card) return;
+  // 稍微延迟一下等 Tab 切完、DOM 渲染完
+  setTimeout(() => {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('just-added');
+    setTimeout(() => card.classList.remove('just-added'), 2200);
+  }, 50);
+}
 
 // ========== Tab 1: 发现职位 (实时多源聚合) ==========
 async function fetchJobs(){
@@ -363,6 +375,7 @@ function saveTracker(){
   save(); renderKanban(); closeTrackerModal();
   // 保存后自动跳到追踪看板,用户能立刻看到新卡片,无需手动切 Tab
   switchToTab('tracker');
+  highlightCard(item.id);
   toast('✅ 已加入追踪看板,可继续编辑阶段/备注');
 }
 
